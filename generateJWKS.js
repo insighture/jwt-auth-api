@@ -1,27 +1,41 @@
 import fs from 'fs';
-import { createPublicKey } from 'crypto';
+import jose from 'node-jose';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Path to your public key
+const PUBLIC_KEY_PATH = 'public.pem';
+
 // Read the public key
-const publicKey = fs.readFileSync('public.pem', 'utf8');
+const publicKey = fs.readFileSync(PUBLIC_KEY_PATH, 'utf8');
 
-// Convert the public key to a format that can be used for JWKS
-const keyObj = createPublicKey(publicKey);
-const keyBuffer = keyObj.export({ format: 'der', type: 'spki' });
+// Function to generate JWKS
+async function generateJWKS() {
+    try {
+        // Import the public key
+        const key = await jose.JWK.asKey(publicKey, 'pem', {
+            kid: process.env.JWT_KEY_ID, // Set the Key ID here
+            alg: process.env.JWT_ALGORITHM, // Specify the signing algorithm (if applicable)
+            use: 'sig' // Define the key use (signature)
+        });
 
-// Generate the JWKS structure
-const jwk = {
-    kty: 'RSA',
-    n: Buffer.from(keyBuffer).toString('base64url'), // Convert modulus to base64url
-    e: 'AQAB', // Standard exponent
-    alg: process.env.JWT_ALGORITHM,
-    use: 'sig',
-    kid: process.env.JWT_KEY_ID,
-};
+        // Create a JWKS with the public key
+        const keystore = jose.JWK.createKeyStore();
+        await keystore.add(key);
 
-// Write JWKS to a JSON file
-fs.writeFileSync('jwks.json', JSON.stringify({ keys: [jwk] }, null, 2));
 
-console.log('✅ JWKS generated successfully:', JSON.stringify({ keys: [jwk] }, null, 2));
+        // Export the JWKS
+        const jwks = keystore.toJSON();
+
+        // Save the JWKS to a file
+        fs.writeFileSync('jwks.json', JSON.stringify(jwks, null, 2));
+        console.log('✅ JWKS generated and saved to jwks.json');
+        console.log(jwks);
+    } catch (error) {
+        console.error('Error generating JWKS:', error);
+    }
+}
+
+// Run the function
+generateJWKS();

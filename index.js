@@ -63,7 +63,7 @@ app.post('/validate-token', async (req, res) => {
     }
 
     try {
-        const payload = jwt.verify(token, PUBLIC_KEY, { algorithms: [process.env.JWT_ALGORITHM] });
+        const payload = await verifier.verify(token);
         res.json({ valid: true, decoded: payload });
     } catch (error) {
         console.error(error);
